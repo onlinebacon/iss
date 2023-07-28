@@ -1,0 +1,118 @@
+<html>
+	<head>
+		<style>
+			body {
+				background-color: #222;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas width="800" height="600"></canvas>
+	</body>
+</html>
+<script>
+	const canvas = document.querySelector('canvas');
+	const ctx = canvas.getContext('2d');
+	const G = 6.6743e-11;
+	const dt = 0.0001;
+	const iss_height = 408e+3;
+	const earth_radius = 6.371e+6;
+	const d1 = iss_height + earth_radius;
+	const earth_mass = 5.9722e+24;
+	const dist = 3;
+	const marble_mass = 0.1;
+	const marble_dis = 5;
+	const init_acc = G*(earth_mass + marble_mass)/(d1**2);
+	const v1 = Math.sqrt(d1*init_acc);
+	const period = d1*Math.PI*2/v1;
+	const d0 = d1 - dist;
+	const d2 = d1 + dist;
+	const v0 = 2*Math.PI*d0/period;
+	const v2 = 2*Math.PI*d2/period;
+	let scale = 50;
+	const bodies = [
+		{ mass: earth_mass,  x: 0,  y: 0, vx: 0, vy: 0,  rad: 30, color: '#07f' },
+		{ mass: marble_mass, x: d1, y: 0, vx: 0, vy: v1, rad: 5,  color: '#555' },
+		{ mass: marble_mass, x: d0, y: 0, vx: 0, vy: v0, rad: 5,  color: '#444' },
+		{ mass: marble_mass, x: d2, y: 0, vx: 0, vy: v2, rad: 5,  color: '#666' },
+	];
+	const earth = bodies[0];
+	const ref = bodies[1];
+	const interact = (a, b) => {
+		const { x: ax, y: ay, mass: ma } = a;
+		const { x: bx, y: by, mass: mb } = b;
+		const dx = bx - ax;
+		const dy = by - ay;
+		const dSqr = dx*dx + dy*dy;
+		const d = Math.sqrt(dSqr);
+		const nx = dx/d;
+		const ny = dy/d;
+		const gf = ma*mb*G/dSqr;
+		const c = gf*dt;
+		const aAcc = c/ma;
+		const bAcc = c/mb;
+		a.vx += nx*aAcc;
+		a.vy += ny*aAcc;
+		b.vx -= nx*bAcc;
+		b.vy -= ny*bAcc;
+	};
+	const runIt = () => {
+		for (let i=1; i<bodies.length; ++i) {
+			const a = bodies[i];
+			for (let j=0; j<i; j++) {
+				const b = bodies[j];
+				interact(a, b);
+			}
+		}
+		for (let body of bodies) {
+			body.x += body.vx*dt;
+			body.y += body.vy*dt;
+		}
+	};
+	const project = ({ x, y }) => {
+		let dx = ref.x - earth.x;
+		let dy = ref.y - earth.y;
+		let len = Math.sqrt(dx*dx + dy*dy);
+		let sin = dx/len;
+		let cos = dy/len;
+		dx = x - ref.x;
+		dy = y - ref.y;
+		[ dx, dy ] = [
+			dx*cos - dy*sin,
+			dy*cos + dx*sin,
+		]
+		dx *= scale;
+		dy *= scale;
+		return [
+			canvas.width*0.5 + dx,
+			canvas.height*0.5 - dy,
+		];
+	};
+	const render = () => {
+		ctx.fillStyle = '#111';
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		for (let body of bodies) {
+			ctx.fillStyle = body.color;
+			ctx.beginPath();
+			ctx.arc(...project(body), body.rad, 0, Math.PI*2);
+			ctx.fill();
+		}
+	};
+	setInterval(() => {
+		const t0 = Date.now();
+		for (;;) {
+			const t1 = Date.now() - t0;
+			if (t1 > 30) break;
+			runIt();
+		}
+	}, 0);
+	const frameLoop = () => {
+		render();
+		requestAnimationFrame(frameLoop);
+	};
+	frameLoop();
+	window.addEventListener('wheel', e => {
+		const { deltaY } = e;
+		scale *= 1 - deltaY*1e-3;
+	});
+</script>
